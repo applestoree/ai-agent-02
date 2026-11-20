@@ -1654,17 +1654,10 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
 
             <div class="space-y-2">
               <label for="prompt-category-select" class="block text-[11px] font-semibold text-neutral-700">Pilih Categories</label>
-              <select
-                id="prompt-category-select"
-                ${state.isLoadingPromptCategories || state.isGeneratingPrompt || state.isSavingGeneratedPrompt ? 'disabled' : ''}
-                class="w-full h-11 rounded-lg border border-neutral-200 bg-white px-3 text-xs text-neutral-800 disabled:bg-neutral-100"
-              >
-                <option value="">Pilih kategori prompt</option>
-                ${PROMPT_CATEGORIES.map((category) => {
-                  const count = state.promptCategoryCounts[category] ?? 0;
-                  return `<option value="${escapeHtml(category)}" ${state.selectedPromptCategory === category ? 'selected' : ''}>${escapeHtml(category)} (${count})</option>`;
-                }).join('')}
-              </select>
+              <button type="button" data-action="open-category-sheet" data-category-source="prompt" ${state.isLoadingPromptCategories || state.isGeneratingPrompt || state.isSavingGeneratedPrompt ? "disabled" : ""} class="w-full h-11 rounded-lg border border-neutral-200 bg-white px-3 flex items-center justify-between text-xs text-neutral-800 disabled:bg-neutral-100 disabled:opacity-60">
+                <span>${escapeHtml(state.selectedPromptCategory || "Pilih kategori prompt")}</span>
+                <i data-lucide="chevron-down" class="w-4 h-4 text-neutral-500"></i>
+              </button>
               <div class="flex items-center justify-between gap-2">
                 <p class="text-[10px] text-neutral-500">${state.isLoadingPromptCategories ? 'Memuat jumlah prompt per kategori...' : 'Pilih satu kategori sebelum Generate.'}</p>
                 <button type="button" data-action="refresh-prompt-category-counts" ${state.isLoadingPromptCategories || state.isGeneratingPrompt || state.isSavingGeneratedPrompt ? 'disabled' : ''} class="shrink-0 text-[10px] font-medium text-neutral-700 underline disabled:opacity-40">Refresh</button>
@@ -2091,6 +2084,24 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
       `;
     }
 
+    function renderCategoryBottomSheet() {
+      if (!state.bottomSheet) return '';
+      const isPrompt = state.bottomSheet.source === 'prompt';
+      const selectedValue = isPrompt ? state.selectedPromptCategory : state.selectedTemplateCategory;
+      const options = PROMPT_CATEGORIES.map((category) => {
+        const count = isPrompt ? (state.promptCategoryCounts[category] ?? 0) : state.records.filter((record) => {
+          const raw = record?.categories;
+          const values = Array.isArray(raw) ? raw : String(raw || '').split(',').map((item) => item.trim());
+          return values.includes(category);
+        }).length;
+        const selected = selectedValue === category;
+        const buttonClass = selected ? "bg-neutral-900 text-white" : "text-neutral-800 hover:bg-neutral-100";
+        const countClass = selected ? "text-neutral-300" : "text-neutral-500";
+        const check = selected ? '<i data-lucide="check" class="w-4 h-4"></i>' : "";
+        return '<button type="button" data-action="select-bottom-sheet-category" data-category="' + escapeHtml(category) + '" class="w-full min-h-12 rounded-xl px-3 flex items-center justify-between text-left ' + buttonClass + '"><span class="text-xs font-medium">' + escapeHtml(category) + '</span><span class="flex items-center gap-2 text-[10px] ' + countClass + '">' + count + (isPrompt ? " prompts" : " templates") + check + "</span></button>";
+      }).join('');
+      return '<div class="fixed inset-0 z-[60] flex items-end justify-center bg-black/40" data-action="close-category-sheet"><section role="dialog" aria-modal="true" aria-label="Pilih Categories" class="w-full max-w-[500px] rounded-t-3xl bg-white shadow-2xl animate-slide-up pb-[max(1rem,env(safe-area-inset-bottom))]" onclick="event.stopPropagation()"><div class="px-4 pt-3 pb-3 border-b border-neutral-100"><div class="w-10 h-1 rounded-full bg-neutral-300 mx-auto mb-3"></div><div class="flex items-center justify-between"><h3 class="text-sm font-semibold text-neutral-900">Pilih Categories</h3><button type="button" data-action="close-category-sheet" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center" aria-label="Tutup"><i data-lucide="x" class="w-4 h-4"></i></button></div></div><div class="max-h-[55vh] overflow-y-auto p-3 space-y-1">' + options + "</div></section></div>";
+    }
     function renderFullViewModal() {
       const activePreviewSrc =
         state.uploadedImageUrl ||
@@ -2178,6 +2189,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
           }
           ${renderSettingsOverlay()}
           ${renderFullViewModal()}
+          ${renderCategoryBottomSheet()}
         </div>
       `;
 
@@ -2202,17 +2214,6 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
             state.logoPreviewUrl = URL.createObjectURL(file);
             showToast('success', 'Brand logo attached successfully.');
           }
-        };
-      }
-
-      const promptCategorySelect = document.getElementById('prompt-category-select');
-      if (promptCategorySelect) {
-        promptCategorySelect.onchange = (e) => {
-          state.selectedPromptCategory = PROMPT_CATEGORIES.includes(e.target.value) ? e.target.value : '';
-          state.generatedPrompt = '';
-          state.savedGeneratedPromptId = null;
-          state.promptGeneratorError = null;
-          render();
         };
       }
 
@@ -2251,6 +2252,40 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
       const slot = btn.getAttribute('data-slot');
 
       switch (action) {
+        case 'open-category-sheet':
+          if (!btn.disabled) {
+            state.bottomSheet = { source: btn.getAttribute('data-category-source') || 'templates' };
+            render();
+          }
+          break;
+
+        case 'close-category-sheet':
+          state.bottomSheet = null;
+          render();
+          break;
+
+        case 'select-bottom-sheet-category': {
+          const category = btn.getAttribute('data-category');
+          if (PROMPT_CATEGORIES.includes(category)) {
+            if (state.bottomSheet?.source === 'prompt') {
+              state.selectedPromptCategory = category;
+              state.generatedPrompt = '';
+              state.savedGeneratedPromptId = null;
+              state.promptGeneratorError = null;
+            } else {
+              state.selectedTemplateCategory = category;
+              state.selectedRecordId = null;
+              state.selectedRecord = null;
+              state.variables = { ...EMPTY_VARIABLES };
+              state.generatedImageBase64 = null;
+              state.uploadedImageUrl = null;
+            }
+          }
+          state.bottomSheet = null;
+          render();
+          break;
+        }
+
         case 'nav-templates':
           state.activeTab = 'templates';
           state.selectedCalendarRecordId = null;
@@ -2261,18 +2296,21 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
           break;
 
         case 'nav-history':
+          state.bottomSheet = null;
           state.activeTab = 'history';
           state.selectedCalendarRecordId = null;
           loadHistory();
           break;
 
         case 'nav-calendar':
+          state.bottomSheet = null;
           state.activeTab = 'calendar';
           state.selectedCalendarRecordId = null;
           loadCalendar();
           break;
 
         case 'nav-settings':
+          state.bottomSheet = null;
           state.activeTab = 'settings';
           state.selectedCalendarRecordId = null;
           render();
@@ -2462,6 +2500,20 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
       }
     });
 
+    // Blokir gesture zoom browser: pinch, double tap, dan Ctrl/trackpad zoom.
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach((eventName) => {
+      document.addEventListener(eventName, (event) => event.preventDefault(), { passive: false });
+    });
+    document.addEventListener('touchmove', (event) => {
+      if (event.touches && event.touches.length > 1) event.preventDefault();
+    }, { passive: false });
+    document.addEventListener('dblclick', (event) => event.preventDefault(), { passive: false });
+    document.addEventListener('wheel', (event) => {
+      if (event.ctrlKey || event.metaKey) event.preventDefault();
+    }, { passive: false });
+    document.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && ['+', '=', '-', '0'].includes(event.key)) event.preventDefault();
+    });
     // Inisialisasi aplikasi saat halaman selesai dimuat
     window.addEventListener('DOMContentLoaded', () => {
       render();
