@@ -738,7 +738,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
               return result;
             }, {});
           }
-          return String(value ?? '').trim().toLowerCase().replace(/\\s+/g, ' ');
+          return String(value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
         };
         const candidateConcept = Object.fromEntries(
           conceptKeys.map((key) => [key, normalizeConceptValue(generatedData[key])])
