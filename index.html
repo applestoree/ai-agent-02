@@ -13,6 +13,18 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    #app {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+    }
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
@@ -26,7 +38,7 @@
   </style>
 </head>
 <body class="bg-[#F5F5F7] text-neutral-900 antialiased selection:bg-black selection:text-white">
-  <div id="app" class="h-[100dvh] w-full bg-[#F5F5F7] flex justify-center overflow-hidden"></div>
+  <div id="app" class="w-full h-full min-h-0 bg-[#F5F5F7] flex justify-center overflow-hidden"></div>
 
   <script>
     // =========================================================================
@@ -48,7 +60,7 @@
       feature_items: '',
       composition: '',
       background: '',
-      typographhy: '',
+      typography: '',
       lighting: ''
     };
 
@@ -130,7 +142,7 @@
     function extractVariablesFromRecord(record) {
       if (!record || typeof record !== 'object') return { ...EMPTY_VARIABLES };
       const typographySource =
-        record.typographhy !== undefined ? record.typographhy : record.typography;
+        record.typography !== undefined ? record.typography : record.typographhy;
 
       return {
         product: serializeFieldForEditor(record.product),
@@ -141,7 +153,7 @@
         feature_items: serializeFieldForEditor(record.feature_items),
         composition: serializeFieldForEditor(record.composition),
         background: serializeFieldForEditor(record.background),
-        typographhy: serializeFieldForEditor(typographySource),
+        typography: serializeFieldForEditor(typographySource),
         lighting: serializeFieldForEditor(record.lighting)
       };
     }
@@ -166,8 +178,8 @@ composition
 ${vars.composition}
 background
 ${vars.background}
-typographhy
-${vars.typographhy}
+typography
+${vars.typography}
 lighting
 ${vars.lighting}
 CREATIVE DIRECTION:
@@ -1726,7 +1738,7 @@ The user has not supplied a product name or additional instructions. Independent
       const hideBottomNav = Boolean(selectedHistoryRecord || selectedCalendarRecord);
 
       appEl.innerHTML = `
-        <div class="w-full max-w-[500px] h-[100dvh] bg-white flex flex-col border-x border-neutral-200 overflow-hidden relative">
+        <div class="w-full max-w-[500px] h-full min-h-0 bg-white flex flex-col border-x border-neutral-200 overflow-hidden relative">
           ${renderToast()}
           <main class="flex-1 min-h-0 overflow-x-hidden bg-[#F5F5F7] p-0 flex flex-col ${isScrollableMain ? 'overflow-y-auto' : 'overflow-hidden'}">
             ${mainContent}
