@@ -171,7 +171,7 @@
       categories = [...new Set(categories.map((item) => String(item || '').trim()).filter(Boolean))];
       if (!categories.length) return '';
       return '<div class="flex flex-wrap gap-1.5">' + categories.map((category) =>
-        '<span class="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-100 px-2 py-0.5 text-[9px] font-medium text-neutral-700">' + escapeHtml(category) + '</span>'
+        '<span class="inline-flex items-center rounded-full bg-black px-2 py-0.5 text-[9px] font-medium text-white">' + escapeHtml(category) + '</span>'
       ).join('') + '</div>';
     }
 
@@ -1917,6 +1917,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
                         } disabled:opacity-60">
                           <div class="min-w-0 flex-1 space-y-0.5">
                             <p class="text-xs font-semibold truncate ${isSelected ? 'text-white' : 'text-black'}">${escapeHtml(productName)}</p>
+                            ${renderCategoryBadges(rec)}
                             ${subtextStr ? `<p class="text-[11px] truncate ${isSelected ? 'text-neutral-300' : 'text-neutral-500'}">${escapeHtml(subtextStr)}</p>` : ''}
                           </div>
                           <div class="shrink-0">
