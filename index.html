@@ -417,29 +417,72 @@ Follow all variables precisely. Do not invent additional headlines, product spec
       }
     }
 
-    async function loadScheduleAvailability(date) {
-      if (!date) return;
+    function getKualaLumpurDateTime() {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kuala_Lumpur',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23'
+      }).formatToParts(new Date());
+      const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+      return {
+        date: `${values.year}-${values.month}-${values.day}`,
+        time: `${values.hour}:${values.minute}`
+      };
+    }
+
+    function addDaysToDate(dateString, days) {
+      const date = new Date(`${dateString}T00:00:00Z`);
+      date.setUTCDate(date.getUTCDate() + days);
+      return date.toISOString().slice(0, 10);
+    }
+
+    async function loadNextAvailableScheduleSlot(records = null) {
       state.isLoadingScheduleSlots = true;
       state.availableScheduleSlots = [];
       state.selectedScheduleSlot = '';
       render();
       try {
-        const response = await fetch(`${CRUD_MAKE_WEBHOOK_URL}/get`, {
-          method: 'GET',
-          headers: getEdgeHeaders(false)
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok || payload?.success === false || !Array.isArray(payload?.data)) {
-          throw new Error(payload?.error || 'Unable to load existing schedule date and time.');
+        let calendarRecords = records;
+        if (!Array.isArray(calendarRecords)) {
+          const response = await fetch(`${CRUD_MAKE_WEBHOOK_URL}/get`, {
+            method: 'GET',
+            headers: getEdgeHeaders(false)
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || payload?.success === false || !Array.isArray(payload?.data)) {
+            throw new Error(payload?.error || 'Unable to load existing schedule date and time.');
+          }
+          calendarRecords = payload.data;
         }
-        const occupiedTimes = new Set(
-          payload.data
-            .filter((item) => String(item.date || '').slice(0, 10) === date)
-            .map((item) => String(item.time || '').slice(0, 5))
+
+        const occupiedSlots = new Set(
+          calendarRecords.map((item) =>
+            `${String(item.date || '').slice(0, 10)}|${String(item.time || '').slice(0, 5)}`
+          )
         );
-        state.availableScheduleSlots = CALENDAR_SLOTS.filter((slot) => !occupiedTimes.has(slot));
+        const now = getKualaLumpurDateTime();
+        for (let dayOffset = 0; dayOffset <= 3650; dayOffset += 1) {
+          const candidateDate = addDaysToDate(now.date, dayOffset);
+          const candidateSlot = CALENDAR_SLOTS.find((slot) => {
+            if (dayOffset === 0 && slot <= now.time) return false;
+            return !occupiedSlots.has(`${candidateDate}|${slot}`);
+          });
+          if (candidateSlot) {
+            state.scheduleDate = candidateDate;
+            state.selectedScheduleSlot = candidateSlot;
+            state.availableScheduleSlots = [candidateSlot];
+            return;
+          }
+        }
+        throw new Error('Tidak ditemukan slot jadwal kosong dalam 10 tahun ke depan.');
       } catch (err) {
-        showToast('error', err.message || 'Failed to check schedule availability.');
+        state.scheduleDate = '';
+        state.selectedScheduleSlot = '';
+        showToast('error', err.message || 'Failed to find the next available schedule slot.');
       } finally {
         state.isLoadingScheduleSlots = false;
         render();
@@ -473,8 +516,10 @@ Follow all variables precisely. Do not invent additional headlines, product spec
           String(item.time || '').slice(0, 5) === state.selectedScheduleSlot
         );
         if (slotIsOccupied) {
-          await loadScheduleAvailability(state.scheduleDate);
-          throw new Error('Slot tersebut baru saja terisi. Silakan pilih slot waktu lain.');
+          await loadNextAvailableScheduleSlot(existingPayload.data);
+          if (!state.scheduleDate || !state.selectedScheduleSlot) {
+            throw new Error('Tidak ada slot jadwal kosong yang tersedia.');
+          }
         }
 
         const response = await fetch(`${CRUD_MAKE_WEBHOOK_URL}/post`, {
@@ -2032,43 +2077,24 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
               </div>
             </div>
             <div class="p-4 space-y-4">
-              <div class="space-y-2">
-                <label class="block text-xs font-semibold text-neutral-700">Tanggal publikasi</label>
-                <input
-                  id="schedule-date-input"
-                  type="date"
-                  value="${escapeHtml(state.scheduleDate)}"
-                  min="${escapeHtml(today)}"
-                  ${state.isScheduling ? 'disabled' : ''}
-                  class="w-full h-11 rounded-xl border border-neutral-200 bg-white px-3 text-sm text-neutral-800"
-                />
-              </div>
-              <div class="space-y-2">
-                <p class="text-xs font-semibold text-neutral-700">Pilih slot waktu</p>
+              <div class="space-y-3">
+                <p class="text-xs font-semibold text-neutral-700">Jadwal publikasi otomatis</p>
                 ${
                   state.isLoadingScheduleSlots
-                    ? `<div class="flex items-center gap-2 py-3 text-xs text-neutral-500"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Memeriksa ketersediaan jadwal...</div>`
-                    : `<div class="grid grid-cols-3 gap-2">
-                        ${CALENDAR_SLOTS.map((slot) => {
-                          const isAvailable = state.availableScheduleSlots.includes(slot);
-                          const isSelected = state.selectedScheduleSlot === slot;
-                          const btnClass = !isAvailable
-                            ? 'py-3 rounded-xl border text-xs font-semibold bg-neutral-100 border-neutral-100 text-neutral-300 line-through'
-                            : isSelected
-                            ? 'py-3 rounded-xl border text-xs font-semibold bg-black border-black text-white'
-                            : 'py-3 rounded-xl border text-xs font-semibold bg-white border-neutral-200 text-neutral-700';
-                          return `
-                            <button type="button" data-action="select-schedule-slot" data-slot="${escapeHtml(slot)}" ${!isAvailable || state.isScheduling ? 'disabled' : ''} class="${btnClass} disabled:cursor-not-allowed">
-                              ${escapeHtml(slot)}${!isAvailable ? ' · Penuh' : ''}
-                            </button>
-                          `;
-                        }).join('')}
-                      </div>`
-                }
-                ${
-                  !state.isLoadingScheduleSlots && state.availableScheduleSlots.length === 0
-                    ? `<p class="text-xs text-amber-700 bg-amber-50 rounded-xl p-3">Semua slot pada tanggal ini sudah terisi.</p>`
-                    : ''
+                    ? `<div class="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-500"><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Mencari slot kosong berikutnya dari make_webhook...</div>`
+                    : state.scheduleDate && state.selectedScheduleSlot
+                    ? `<div class="grid grid-cols-2 gap-3">
+                        <div class="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                          <p class="text-[10px] text-neutral-500 mb-1">Tanggal</p>
+                          <p class="text-sm font-semibold text-neutral-900">${escapeHtml(state.scheduleDate)}</p>
+                        </div>
+                        <div class="rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+                          <p class="text-[10px] text-neutral-500 mb-1">Waktu (MYT)</p>
+                          <p class="text-sm font-semibold text-neutral-900">${escapeHtml(state.selectedScheduleSlot)}</p>
+                        </div>
+                      </div>
+                      <p class="text-[11px] text-neutral-500">Slot kosong paling awal dipilih otomatis berdasarkan data make_webhook.</p>`
+                    : `<p class="text-xs text-amber-700 bg-amber-50 rounded-xl p-3">Slot kosong belum dapat ditemukan. Tutup lalu coba kembali.</p>`
                 }
               </div>
             </div>
@@ -2214,15 +2240,6 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
             state.logoPreviewUrl = URL.createObjectURL(file);
             showToast('success', 'Brand logo attached successfully.');
           }
-        };
-      }
-
-      const scheduleDateInput = document.getElementById('schedule-date-input');
-      if (scheduleDateInput) {
-        scheduleDateInput.onchange = (e) => {
-          const nextDate = e.target.value;
-          state.scheduleDate = nextDate;
-          loadScheduleAvailability(nextDate);
         };
       }
 
@@ -2412,11 +2429,10 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
           break;
 
         case 'open-schedule-modal': {
-          const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }).format(new Date());
-          state.scheduleDate = today;
+          state.scheduleDate = '';
           state.selectedScheduleSlot = '';
           state.scheduleRecordId = id;
-          loadScheduleAvailability(today);
+          loadNextAvailableScheduleSlot();
           break;
         }
 
