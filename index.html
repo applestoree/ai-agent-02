@@ -2100,7 +2100,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
         const check = selected ? '<i data-lucide="check" class="w-4 h-4"></i>' : "";
         return '<button type="button" data-action="select-bottom-sheet-category" data-category="' + escapeHtml(category) + '" class="w-full min-h-12 rounded-xl px-3 flex items-center justify-between text-left ' + buttonClass + '"><span class="text-xs font-medium">' + escapeHtml(category) + '</span><span class="flex items-center gap-2 text-[10px] ' + countClass + '">' + count + (isPrompt ? " prompts" : " templates") + check + "</span></button>";
       }).join('');
-      return '<div class="fixed inset-0 z-[60] flex items-end justify-center bg-black/40" data-action="close-category-sheet"><section role="dialog" aria-modal="true" aria-label="Pilih Categories" class="w-full max-w-[500px] rounded-t-3xl bg-white shadow-2xl animate-slide-up pb-[max(1rem,env(safe-area-inset-bottom))]" onclick="event.stopPropagation()"><div class="px-4 pt-3 pb-3 border-b border-neutral-100"><div class="w-10 h-1 rounded-full bg-neutral-300 mx-auto mb-3"></div><div class="flex items-center justify-between"><h3 class="text-sm font-semibold text-neutral-900">Pilih Categories</h3><button type="button" data-action="close-category-sheet" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center" aria-label="Tutup"><i data-lucide="x" class="w-4 h-4"></i></button></div></div><div class="max-h-[55vh] overflow-y-auto p-3 space-y-1">' + options + "</div></section></div>";
+      return '<div class="fixed inset-0 z-[60] flex items-end justify-center bg-black/40" data-action="close-category-sheet"><section role="dialog" aria-modal="true" aria-label="Pilih Categories" class="w-full max-w-[500px] rounded-t-3xl bg-white shadow-2xl animate-slide-up pb-[max(1rem,env(safe-area-inset-bottom))]"><div class="px-4 pt-3 pb-3 border-b border-neutral-100"><div class="w-10 h-1 rounded-full bg-neutral-300 mx-auto mb-3"></div><div class="flex items-center justify-between"><h3 class="text-sm font-semibold text-neutral-900">Pilih Categories</h3><button type="button" data-action="close-category-sheet" class="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center" aria-label="Tutup"><i data-lucide="x" class="w-4 h-4"></i></button></div></div><div class="max-h-[55vh] overflow-y-auto p-3 space-y-1">' + options + "</div></section></div>";
     }
     function renderFullViewModal() {
       const activePreviewSrc =
@@ -2260,6 +2260,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
           break;
 
         case 'close-category-sheet':
+          if (btn.tagName !== 'BUTTON' && e.target.closest('[role="dialog"]')) break;
           state.bottomSheet = null;
           render();
           break;
