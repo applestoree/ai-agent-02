@@ -1671,7 +1671,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
               id="btn-generate-prompt"
               type="button"
               data-action="generate-prompt"
-              ${!state.selectedPromptCategory || state.isLoadingPromptCategories || state.isGeneratingPrompt || state.isSavingGeneratedPrompt ? 'disabled' : ''}
+              ${!state.selectedPromptCategory || state.isLoadingPromptCategories || state.promptCategoriesError || state.isGeneratingPrompt || state.isSavingGeneratedPrompt ? 'disabled' : ''}
               class="w-full h-10 rounded-lg bg-black text-white text-xs font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <i data-lucide="${state.isGeneratingPrompt ? 'loader-2' : 'sparkles'}" class="w-3.5 h-3.5 ${state.isGeneratingPrompt ? 'animate-spin' : ''}"></i>
