@@ -107,6 +107,8 @@
       promptEditDraft: '',
       isSavingPromptEdit: false,
       deletingPromptId: null,
+      deleteTarget: null,
+      isDeletingRecord: false,
       records: [],
       isLoadingRecords: true,
       recordsError: null,
@@ -1249,6 +1251,24 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
     // =========================================================================
     // KOMPONEN RENDER TAMPILAN
     // =========================================================================
+    function renderDeleteConfirmModal() {
+      if (!state.deleteTarget) return '';
+      const isCalendar = state.deleteTarget.type === 'calendar';
+      return `
+        <div class="absolute inset-0 z-[70] bg-black/50 flex items-center justify-center p-5" role="presentation">
+          <section class="w-full max-w-[360px] rounded-2xl bg-white p-5 shadow-xl" role="alertdialog" aria-modal="true" aria-labelledby="delete-confirm-title" aria-describedby="delete-confirm-description">
+            <div class="w-11 h-11 rounded-full bg-red-50 text-red-600 flex items-center justify-center mb-3"><i data-lucide="trash-2" class="w-5 h-5"></i></div>
+            <h2 id="delete-confirm-title" class="text-base font-semibold text-black">Hapus Detail Post?</h2>
+            <p id="delete-confirm-description" class="mt-2 text-xs leading-relaxed text-neutral-600">${isCalendar ? 'Post ini dan gambar terkait akan dihapus permanen dari Calendar.' : 'Hasil post akan dihapus dari Jadwal. Template produk tetap tersimpan dan tidak ikut dihapus.'}</p>
+            <div class="mt-5 grid grid-cols-2 gap-2">
+              <button type="button" data-action="cancel-delete-record" ${state.isDeletingRecord ? 'disabled' : ''} class="h-10 rounded-xl border border-neutral-200 bg-white text-xs font-semibold text-neutral-700 disabled:opacity-50">Batal</button>
+              <button type="button" data-action="confirm-delete-record" ${state.isDeletingRecord ? 'disabled' : ''} class="h-10 rounded-xl bg-red-600 text-xs font-semibold text-white inline-flex items-center justify-center gap-2 disabled:opacity-50">${state.isDeletingRecord ? '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>Menghapus...' : 'Ya, Hapus'}</button>
+            </div>
+          </section>
+        </div>
+      `;
+    }
+
     function renderToast() {
       if (!state.toast) return '';
       const isErr = state.toast.type === 'error';
@@ -1309,9 +1329,14 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
               </div>
             </div>
             <div class="shrink-0 border-t border-neutral-200 bg-white p-3">
-              <button type="button" data-action="open-schedule-modal" data-id="${escapeHtml(selectedHistoryRecord.id)}" ${!canSchedule ? 'disabled' : ''} class="w-full h-11 rounded-xl bg-black text-white text-xs font-semibold disabled:opacity-40">
-                Jadwalkan
-              </button>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" data-action="request-delete-history" data-id="${escapeHtml(selectedHistoryRecord.id)}" class="h-11 rounded-xl border border-red-200 bg-white text-red-600 text-xs font-semibold inline-flex items-center justify-center gap-2">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>Hapus
+                </button>
+                <button type="button" data-action="open-schedule-modal" data-id="${escapeHtml(selectedHistoryRecord.id)}" ${!canSchedule ? 'disabled' : ''} class="h-11 rounded-xl bg-black text-white text-xs font-semibold disabled:opacity-40">
+                  Jadwalkan
+                </button>
+              </div>
             </div>
           </section>
         `;
@@ -1401,9 +1426,14 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
               </div>
             </div>
             <div class="shrink-0 border-t border-neutral-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <button type="button" data-action="copy-calendar-caption" ${!selectedCalendarRecord.caption ? 'disabled' : ''} class="w-full h-11 rounded-xl bg-black text-white text-xs font-semibold disabled:opacity-40">
-                Copy Caption
-              </button>
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" data-action="request-delete-calendar" data-id="${escapeHtml(selectedCalendarRecord.id)}" class="h-11 rounded-xl border border-red-200 bg-white text-red-600 text-xs font-semibold inline-flex items-center justify-center gap-2">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>Hapus
+                </button>
+                <button type="button" data-action="copy-calendar-caption" ${!selectedCalendarRecord.caption ? 'disabled' : ''} class="h-11 rounded-xl bg-black text-white text-xs font-semibold disabled:opacity-40">
+                  Copy Caption
+                </button>
+              </div>
             </div>
           </section>
         `;
@@ -1584,6 +1614,48 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
         state.settingsPromptsError = err.message || 'Gagal memperbarui prompt.';
       } finally {
         state.isSavingPromptEdit = false;
+        render();
+      }
+    }
+
+    async function handleConfirmDeleteRecord() {
+      const target = state.deleteTarget;
+      if (!target?.id || state.isDeletingRecord) return;
+      state.isDeletingRecord = true;
+      render();
+      try {
+        if (target.type === 'history') {
+          const response = await fetch(`${CRUD_MAKE_PROMPT_URL}?id=${encodeURIComponent(target.id)}`, {
+            method: 'PATCH',
+            headers: getEdgeHeaders(true),
+            body: JSON.stringify({ image_url: null, caption: null, is_ready: false })
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload?.error || `Gagal menghapus hasil post (HTTP ${response.status}).`);
+          state.historyRecords = state.historyRecords.filter((record) => String(record.id) !== String(target.id));
+          state.selectedHistoryId = null;
+          showToast('success', 'Hasil post dihapus. Template tetap tersimpan.');
+        } else if (target.type === 'calendar') {
+          const response = await fetch(`${CRUD_MAKE_WEBHOOK_URL}/deleted`, {
+            method: 'DELETE',
+            headers: getEdgeHeaders(true),
+            body: JSON.stringify({ id: target.id })
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || payload?.success === false) {
+            throw new Error(payload?.error || `Gagal menghapus post Calendar (HTTP ${response.status}).`);
+          }
+          state.calendarRecords = state.calendarRecords.filter((record) => String(record.id) !== String(target.id));
+          state.selectedCalendarRecordId = null;
+          showToast('success', payload?.data?.image_deleted === false
+            ? 'Post dihapus, tetapi gambar di Storage tidak berhasil dihapus.'
+            : 'Post dan gambar terkait berhasil dihapus dari Calendar.');
+        }
+        state.deleteTarget = null;
+      } catch (err) {
+        showToast('error', err.message || 'Gagal menghapus Detail Post.');
+      } finally {
+        state.isDeletingRecord = false;
         render();
       }
     }
@@ -2237,6 +2309,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
           ${renderSettingsOverlay()}
           ${renderFullViewModal()}
           ${renderCategoryBottomSheet()}
+          ${renderDeleteConfirmModal()}
         </div>
       `;
 
@@ -2475,6 +2548,27 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
           if (rec) handleScheduleRecord(rec);
           break;
         }
+
+        case 'request-delete-history':
+          state.deleteTarget = { type: 'history', id };
+          render();
+          break;
+
+        case 'request-delete-calendar':
+          state.deleteTarget = { type: 'calendar', id };
+          render();
+          break;
+
+        case 'cancel-delete-record':
+          if (!state.isDeletingRecord) {
+            state.deleteTarget = null;
+            render();
+          }
+          break;
+
+        case 'confirm-delete-record':
+          handleConfirmDeleteRecord();
+          break;
 
         case 'refresh-calendar':
           loadCalendar();
