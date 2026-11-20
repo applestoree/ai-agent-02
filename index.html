@@ -2014,12 +2014,12 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
               ? `<div class="p-3 rounded-xl bg-white border border-neutral-200 space-y-2">
                   <div class="flex items-center justify-between"><span class="text-[11px] font-semibold text-neutral-800">AI Generated Caption</span>${state.isGeneratingCaption ? '<span class="text-[10px] text-neutral-500">Creating caption...</span>' : ''}</div>
                   ${state.captionError ? `<p class="text-xs text-red-600">${escapeHtml(state.captionError)}</p>` : ''}
-                  ${state.generatedCaption ? `<textarea data-field="generated-caption" rows="7" class="w-full rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-800 resize-y">${escapeHtml(state.generatedCaption)}</textarea><button type="button" data-action="copy-caption" class="w-full h-9 rounded-xl bg-black text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5"><i data-lucide="${state.captionCopied ? 'check' : 'copy'}" class="w-3.5 h-3.5"></i><span>${state.captionCopied ? 'Caption Copied' : 'Copy Caption'}</span></button>` : ''}
+                  ${state.generatedCaption ? `<textarea data-field="generated-caption" rows="7" class="w-full rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-800 resize-y">${escapeHtml(state.generatedCaption)}</textarea><button type="button" data-action="copy-caption" class="hidden w-full h-9 rounded-xl bg-black text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5"><i data-lucide="${state.captionCopied ? 'check' : 'copy'}" class="w-3.5 h-3.5"></i><span>${state.captionCopied ? 'Caption Copied' : 'Copy Caption'}</span></button>` : ''}
                 </div>` : ''
           }
           ${
             state.uploadedImageUrl
-              ? `<div class="p-3 rounded-xl bg-neutral-50 border border-neutral-200 space-y-2">
+              ? `<div class="hidden p-3 rounded-xl bg-neutral-50 border border-neutral-200 space-y-2">
                   <div class="flex items-center justify-between">
                     <span class="text-[11px] font-semibold text-neutral-700">Public URL</span>
                     <a href="${escapeHtml(state.uploadedImageUrl)}" target="_blank" rel="noopener noreferrer" class="text-[11px] font-medium text-black inline-flex items-center gap-1 hover:underline">
@@ -2039,7 +2039,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
               : ''
           }
 
-          <div class="grid grid-cols-2 gap-2 pt-1">
+          <div class="hidden grid grid-cols-2 gap-2 pt-1">
             <button type="button" data-action="retry-generation" ${state.isGenerating || !state.selectedRecord ? 'disabled' : ''} class="h-10 rounded-xl border border-neutral-200 bg-white hover:bg-neutral-50 text-black text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition disabled:opacity-50">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5 ${state.isGenerating ? 'animate-spin' : ''}"></i>
               <span>Regenerate</span>
@@ -2146,7 +2146,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
           <div class="flex-1 flex items-center justify-center my-4 overflow-hidden">
             <img src="${escapeHtml(activePreviewSrc)}" alt="Full Advertisement" class="max-h-full max-w-full rounded-xl object-contain" />
           </div>
-          <div class="flex gap-2">
+          <div class="hidden flex gap-2">
             ${
               state.uploadedImageUrl
                 ? `<button type="button" data-action="copy-image-url" class="flex-1 h-11 rounded-xl bg-white text-black text-xs font-semibold flex items-center justify-center gap-1.5">
