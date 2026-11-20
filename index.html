@@ -535,11 +535,67 @@ Follow all variables precisely. Do not invent additional headlines, product spec
           throw new Error('agent-prompt.md kosong. Periksa instruksi AI di repository GitHub.');
         }
 
+        // Read all saved prompt concepts before asking Gemini to create a new one.
+        const existingPromptsResponse = await fetch(CRUD_MAKE_PROMPT_URL, {
+          method: 'GET',
+          headers: getEdgeHeaders(false)
+        });
+        const existingPromptsPayload = await existingPromptsResponse.json().catch(() => null);
+        if (!existingPromptsResponse.ok || !Array.isArray(existingPromptsPayload)) {
+          throw new Error(
+            existingPromptsPayload?.error ||
+            `Gagal membaca data make_prompt untuk pemeriksaan duplikasi (HTTP ${existingPromptsResponse.status}).`
+          );
+        }
+
+        const conceptKeys = [
+          'product',
+          'headline',
+          'subheadline',
+          'feature_items',
+          'style',
+          'composition',
+          'background',
+          'typography',
+          'lighting',
+          'visual_style'
+        ];
+        const existingConcepts = existingPromptsPayload
+          .filter((record) => record && typeof record === 'object')
+          .map((record) => {
+            const concept = {};
+            for (const key of conceptKeys) {
+              concept[key] = key === 'typography' && record[key] === undefined
+                ? (record.typographhy ?? '')
+                : (record[key] ?? '');
+            }
+            return concept;
+          })
+          .filter((concept) => conceptKeys.some((key) => {
+            const value = concept[key];
+            return Array.isArray(value) ? value.length > 0 : String(value).trim() !== '';
+          }));
+
         const instruction = `${agentInstructions}
 
 ## Application Runtime Instructions
 
-The user has not supplied a product name or additional instructions. Independently select one real Apple product using your internal knowledge and create the internal creative brief described above. Do not request product input. Do not rely on make_prompt reference data as product facts. Return only the exact 10-field JSON object defined in the instructions.
+The user has not supplied a product name or additional instructions. Independently select one real Apple product using your internal knowledge and create the internal creative brief described above. Do not request product input.
+
+## Existing make_prompt Records — Novelty Reference Only
+
+The following JSON contains concepts already saved in the make_prompt database. Use it ONLY to detect repetition and avoid similar creative concepts. It is NOT a source of product facts, specifications, or product research.
+
+${JSON.stringify(existingConcepts)}
+
+Before returning your result:
+1. Compare the candidate against every existing record across all 10 fields: product, headline, subheadline, feature_items, style, composition, background, typography, lighting, and visual_style.
+2. Evaluate the complete creative concept, not only exact wording. Treat concepts as duplicates when their overall product story, advertising angle, feature selection, and visual direction are substantially similar, even if wording differs.
+3. If the candidate is identical or substantially similar to any saved concept, discard it and independently create another concept. Repeat this internal comparison until the candidate is meaningfully distinct from all saved concepts.
+4. Product names may recur only when the new advertising story and complete visual concept are meaningfully different. Do not change wording superficially to disguise a repeated concept.
+5. Never copy or infer product facts from the database. Use only product facts you confidently know.
+
+Return only the exact 10-field JSON object defined in the instructions. Do not include a duplicate-check report or any additional keys.
 `;
 
         const apiKey = '';
@@ -657,6 +713,53 @@ The user has not supplied a product name or additional instructions. Independent
         const existingPayload = await listResponse.json().catch(() => null);
         if (!listResponse.ok || !Array.isArray(existingPayload)) {
           throw new Error(existingPayload?.error || `Gagal membaca ID make_prompt (HTTP ${listResponse.status}).`);
+        }
+
+        // Prevent an exact full-concept duplicate if records changed after generation.
+        const conceptKeys = [
+          'product',
+          'headline',
+          'subheadline',
+          'feature_items',
+          'style',
+          'composition',
+          'background',
+          'typography',
+          'lighting',
+          'visual_style'
+        ];
+        const normalizeConceptValue = (value) => {
+          if (Array.isArray(value)) {
+            return value.map((item) => normalizeConceptValue(item));
+          }
+          if (value && typeof value === 'object') {
+            return Object.keys(value).sort().reduce((result, key) => {
+              result[key] = normalizeConceptValue(value[key]);
+              return result;
+            }, {});
+          }
+          return String(value ?? '').trim().toLowerCase().replace(/\\s+/g, ' ');
+        };
+        const candidateConcept = Object.fromEntries(
+          conceptKeys.map((key) => [key, normalizeConceptValue(generatedData[key])])
+        );
+        const candidateSignature = JSON.stringify(candidateConcept);
+        const exactDuplicate = existingPayload.some((record) => {
+          if (!record || typeof record !== 'object') return false;
+          const existingConcept = Object.fromEntries(
+            conceptKeys.map((key) => [
+              key,
+              normalizeConceptValue(
+                key === 'typography' && record[key] === undefined
+                  ? record.typographhy
+                  : record[key]
+              )
+            ])
+          );
+          return JSON.stringify(existingConcept) === candidateSignature;
+        });
+        if (exactDuplicate) {
+          throw new Error('Konsep prompt ini sudah tersimpan. Silakan generate konsep baru sebelum menyimpan.');
         }
 
         const existingIds = new Set(existingPayload.map((record) => String(record.id)));
