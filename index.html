@@ -2014,7 +2014,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
               ? `<div class="p-3 rounded-xl bg-white border border-neutral-200 space-y-2">
                   <div class="flex items-center justify-between"><span class="text-[11px] font-semibold text-neutral-800">AI Generated Caption</span>${state.isGeneratingCaption ? '<span class="text-[10px] text-neutral-500">Creating caption...</span>' : ''}</div>
                   ${state.captionError ? `<p class="text-xs text-red-600">${escapeHtml(state.captionError)}</p>` : ''}
-                  ${state.generatedCaption ? `<textarea data-field="generated-caption" rows="7" class="w-full rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-800 resize-y">${escapeHtml(state.generatedCaption)}</textarea><button type="button" data-action="copy-caption" class="hidden w-full h-9 rounded-xl bg-black text-white text-xs font-semibold inline-flex items-center justify-center gap-1.5"><i data-lucide="${state.captionCopied ? 'check' : 'copy'}" class="w-3.5 h-3.5"></i><span>${state.captionCopied ? 'Caption Copied' : 'Copy Caption'}</span></button>` : ''}
+                  ${state.generatedCaption ? `<div aria-label="Generated caption" class="w-full rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs leading-relaxed text-neutral-800 whitespace-pre-wrap pointer-events-none">${escapeHtml(state.generatedCaption)}</div>` : ''}
                 </div>` : ''
           }
           ${
