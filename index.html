@@ -157,6 +157,24 @@
       return String(value);
     }
 
+    function renderCategoryBadges(record) {
+      const raw = record?.categories;
+      let categories = Array.isArray(raw) ? raw : [];
+      if (typeof raw === 'string' && raw.trim()) {
+        try {
+          const parsed = JSON.parse(raw);
+          categories = Array.isArray(parsed) ? parsed : raw.split(',');
+        } catch {
+          categories = raw.split(',');
+        }
+      }
+      categories = [...new Set(categories.map((item) => String(item || '').trim()).filter(Boolean))];
+      if (!categories.length) return '';
+      return '<div class="flex flex-wrap gap-1.5">' + categories.map((category) =>
+        '<span class="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-100 px-2 py-0.5 text-[9px] font-medium text-neutral-700">' + escapeHtml(category) + '</span>'
+      ).join('') + '</div>';
+    }
+
     function extractVariablesFromRecord(record) {
       if (!record || typeof record !== 'object') return { ...EMPTY_VARIABLES };
       const typographySource =
@@ -1281,6 +1299,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
                 }
               </div>
               <div class="p-3 space-y-3">
+                ${renderCategoryBadges(selectedHistoryRecord)}
                 <div class="flex items-center gap-3 text-neutral-800">
                   <span class="text-lg leading-none">♡</span>
                   <span class="text-lg leading-none">○</span>
@@ -1333,6 +1352,7 @@ Return only the exact 10-field JSON object defined in the instructions. Do not i
                           </div>
                           <div class="min-w-0 flex-1">
                             <p class="text-xs font-semibold text-neutral-900 truncate">${escapeHtml(productName)}</p>
+                            ${renderCategoryBadges(record)}
                             <p class="mt-1 text-[10px] text-neutral-500 line-clamp-2">${escapeHtml(captionText)}</p>
                             <p class="mt-2 text-[10px] font-medium text-neutral-700">Lihat detail post</p>
                           </div>
